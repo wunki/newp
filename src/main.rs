@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::io::Error;
 
-use chrono::Local;
+use chrono::{DateTime, Local};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 use slug::slugify;
 use std::fs::File;
@@ -26,11 +26,20 @@ enum ContentType {
 
 #[derive(Debug)]
 struct Content {
-    content_type: ContentType,
     title: String,
+    content_type: ContentType,
+    date: DateTime<Local>,
 }
 
 impl Content {
+    fn new(title: String, content_type: ContentType) -> Self {
+        Self {
+            title,
+            content_type,
+            date: Local::now(),
+        }
+    }
+
     fn filename(&self) -> String {
         let mut filename = String::from("content/");
         match &self.content_type {
@@ -47,10 +56,9 @@ impl Content {
     /// Takes the [`TEMPLATE`] and fill it in according to the fields
     /// of the [`Content`].
     fn contents(&self) -> String {
-        let current_date = Local::now().to_rfc3339();
         TEMPLATE
             .replace("{title}", &self.title)
-            .replace("{date}", &current_date)
+            .replace("{date}", &self.date.to_rfc3339())
             .replace(
                 "{template}",
                 match self.content_type {
@@ -96,10 +104,7 @@ fn main() {
         .interact_text()
         .unwrap();
 
-    let content = Content {
-        content_type,
-        title,
-    };
+    let content = Content::new(title, content_type);
 
     content
         .write_template()
@@ -117,34 +122,24 @@ mod tests {
 
     #[test]
     fn content_filename_returns_expected_value() {
-        let content = Content {
-            content_type: ContentType::Note,
-            title: String::from("Test Title"),
-        };
+        let content = Content::new(String::from("Test Title"), ContentType::Note);
 
         assert_eq!(content.filename(), "content/notes/test-title.md");
     }
 
     #[test]
     fn content_slugify_returns_expected_value() {
-        let content = Content {
-            content_type: ContentType::Note,
-            title: String::from("Test Title"),
-        };
+        let content = Content::new(String::from("Test Title"), ContentType::Note);
 
         assert_eq!(content.slugify(), "test-title");
     }
 
     #[test]
     fn content_contents_returns_expected_value() {
-        let content = Content {
-            content_type: ContentType::Note,
-            title: String::from("Test Title"),
-        };
-        let current_date = Local::now().to_rfc3339();
+        let content = Content::new(String::from("Test Title"), ContentType::Note);
 
         let contents = content.contents();
-        assert!(contents.contains(&format!("date: {}", current_date)));
+        assert!(contents.contains(&format!("date: {}", content.date.to_rfc3339())));
         assert!(contents.contains("title:  \"Test Title\""));
         assert!(contents.contains("template: \"note.html\""));
         assert!(contents.contains("tags: []"));
